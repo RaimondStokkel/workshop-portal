@@ -1,36 +1,58 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## Prompt Party Workshop
 
-## Getting Started
+A hands-on playground for experimenting with prompt engineering, built with Next.js 15 and Tailwind. The app pairs a Markdown-based curriculum with a live chat and image generation surface backed by your Azure AI Foundry deployment.
 
-First, run the development server:
+### Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- Workshop reader that streams fun Markdown lessons from `content/workshop`.
+- Prompt playground with controls for system prompt, temperature, top-p, and reasoning mode.
+- Image generation panel that supports multiple output sizes.
+- Secure server-side routes that call Azure OpenAI via API key or managed identity.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Local Setup
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Install dependencies:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+	```bash
+	npm install
+	```
 
-## Learn More
+2. Copy `.env.example` to `.env.local` and fill in your Azure AI Foundry values:
 
-To learn more about Next.js, take a look at the following resources:
+	```ini
+	AZURE_OPENAI_ENDPOINT="https://<your-endpoint>.openai.azure.com"
+	AZURE_OPENAI_API_VERSION="2024-08-01-preview"
+	AZURE_OPENAI_CHAT_DEPLOYMENT="<chat-deployment-name>"
+	AZURE_OPENAI_IMAGE_DEPLOYMENT="<image-deployment-name>"
+	AZURE_OPENAI_API_KEY="<optional-api-key-if-not-using-managed-identity>"
+	AZURE_OPENAI_USE_MANAGED_IDENTITY="false"
+	```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+3. Start the dev server:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+	```bash
+	npm run dev
+	```
 
-## Deploy on Vercel
+	Visit [http://localhost:3000](http://localhost:3000) and begin experimenting.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Deploying to Azure App Service
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Ensure you are logged into Azure CLI and have selected the right subscription.
+2. Provision an App Service (Linux, Node 20+) and set the environment variables from `.env.example` in the App Service configuration.
+3. Deploy with Azure Developer CLI or Azure CLI. A quick option with zip deployment:
+
+	```bash
+	npm run build
+	az webapp up --name <app-name> --resource-group <rg-name> --runtime "NODE|20-lts" --plan <app-service-plan>
+	```
+
+	Afterwards, configure `AZURE_OPENAI_USE_MANAGED_IDENTITY=true` if you assign a managed identity with access to the Azure OpenAI resource.
+
+### Customizing the Workshop
+
+- Add or edit Markdown lessons inside `content/workshop`. Filenames determine ordering.
+- Update `src/components/WorkshopView.tsx` if you want to tweak the playground layout or add new controls.
+- Extend API routes under `src/app/api/ai` for additional tooling (for example, evaluation endpoints).
+
+Enjoy hosting your own prompt party!
