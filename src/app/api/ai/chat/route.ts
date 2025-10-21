@@ -71,8 +71,6 @@ export async function POST(request: NextRequest) {
 
   const payload: Record<string, unknown> = {
     messages,
-    temperature,
-    top_p: topP,
   };
 
   const includeReasoningParam =
@@ -88,6 +86,9 @@ export async function POST(request: NextRequest) {
     if (reasoning?.maxOutputTokens) {
       payload.max_completion_tokens = reasoning.maxOutputTokens;
     }
+  } else {
+    payload.temperature = temperature;
+    payload.top_p = topP;
   }
 
   const targetDeployment = wantsReasoning ? reasoningDeployment! : defaultDeployment;

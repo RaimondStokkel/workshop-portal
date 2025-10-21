@@ -370,7 +370,8 @@ export function WorkshopView() {
                       step="0.1"
                       value={temperature}
                       onChange={(event) => setTemperature(Number(event.target.value))}
-                      className="accent-lime-400"
+                      className={`accent-lime-400 ${reasoningEnabled ? "opacity-50" : ""}`}
+                      disabled={reasoningEnabled}
                     />
                   </label>
                   <label className="flex flex-col gap-1">
@@ -384,7 +385,8 @@ export function WorkshopView() {
                       step="0.05"
                       value={topP}
                       onChange={(event) => setTopP(Number(event.target.value))}
-                      className="accent-lime-400"
+                      className={`accent-lime-400 ${reasoningEnabled ? "opacity-50" : ""}`}
+                      disabled={reasoningEnabled}
                     />
                   </label>
                 </div>
@@ -425,6 +427,11 @@ export function WorkshopView() {
                       </div>
                     </>
                   ) : null}
+                {reasoningEnabled ? (
+                  <p className="text-xs text-slate-300">
+                    Temperature and top-p are fixed for reasoning models.
+                  </p>
+                ) : null}
                 </div>
                 <button
                   type="button"
