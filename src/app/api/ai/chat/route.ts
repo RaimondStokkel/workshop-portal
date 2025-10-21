@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
       };
     }
     if (reasoning?.maxOutputTokens) {
-      payload.max_tokens = reasoning.maxOutputTokens;
+      payload.max_completion_tokens = reasoning.maxOutputTokens;
     }
   }
 
