@@ -32,7 +32,7 @@ export function WorkshopView() {
   const [topP, setTopP] = useState<number>(0.9);
   const [reasoningEnabled, setReasoningEnabled] = useState<boolean>(false);
   const [reasoningEffort, setReasoningEffort] = useState<"low" | "medium" | "high">("medium");
-  const [maxOutputTokens, setMaxOutputTokens] = useState<number>(800);
+  const [maxOutputTokens, setMaxOutputTokens] = useState<number>(3000);
   const [chatResult, setChatResult] = useState<string>("");
   const [chatUsage, setChatUsage] = useState<string>("");
   const [chatLoading, setChatLoading] = useState(false);
