@@ -18,10 +18,16 @@ const chatSchema = z.object({
 
 export async function POST(request: NextRequest) {
   const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
-  const deployment = process.env.AZURE_OPENAI_CHAT_DEPLOYMENT;
+  const defaultDeployment = process.env.AZURE_OPENAI_CHAT_DEPLOYMENT;
   const apiVersion = process.env.AZURE_OPENAI_API_VERSION;
+  const reasoningDeployment = process.env.AZURE_OPENAI_REASONING_DEPLOYMENT;
+  const reasoningApiVersion =
+    process.env.AZURE_OPENAI_REASONING_API_VERSION ?? apiVersion;
+  const reasoningEndpoint =
+    process.env.AZURE_OPENAI_REASONING_ENDPOINT ?? endpoint;
+  const reasoningApiKey = process.env.AZURE_OPENAI_REASONING_API_KEY;
 
-  if (!endpoint || !deployment || !apiVersion) {
+  if (!endpoint || !defaultDeployment || !apiVersion) {
     return NextResponse.json(
       {
         error:
@@ -46,6 +52,17 @@ export async function POST(request: NextRequest) {
   }
 
   const { systemPrompt, prompt, temperature, topP, reasoning } = parsed;
+  const wantsReasoning = Boolean(reasoning?.enabled);
+
+  if (wantsReasoning && !reasoningDeployment) {
+    return NextResponse.json(
+      {
+        error:
+          "Reasoning toggle is enabled but AZURE_OPENAI_REASONING_DEPLOYMENT is not set.",
+      },
+      { status: 400 },
+    );
+  }
 
   const messages = [
     ...(systemPrompt ? [{ role: "system", content: systemPrompt }] : []),
@@ -58,19 +75,43 @@ export async function POST(request: NextRequest) {
     top_p: topP,
   };
 
-  if (reasoning?.enabled) {
-    payload.reasoning = {
-      effort: reasoning.effort ?? "medium",
-    };
-    if (reasoning.maxOutputTokens) {
+  const includeReasoningParam =
+    process.env.AZURE_OPENAI_REASONING_INCLUDE_REASONING_PARAM?.toLowerCase() ===
+    "true";
+
+  if (wantsReasoning) {
+    if (includeReasoningParam) {
+      payload.reasoning = {
+        effort: reasoning.effort ?? "medium",
+      };
+      if (reasoning.maxOutputTokens) {
+        payload.max_output_tokens = reasoning.maxOutputTokens;
+      }
+    } else if (reasoning?.maxOutputTokens) {
       payload.max_output_tokens = reasoning.maxOutputTokens;
     }
   }
 
+  const targetDeployment = wantsReasoning ? reasoningDeployment! : defaultDeployment;
+  const targetApiVersion = wantsReasoning ? reasoningApiVersion : apiVersion;
+  const targetEndpoint = wantsReasoning ? reasoningEndpoint : endpoint;
+
+  if (!targetEndpoint) {
+    return NextResponse.json(
+      {
+        error:
+          "Reasoning toggle is enabled but neither AZURE_OPENAI_REASONING_ENDPOINT nor AZURE_OPENAI_ENDPOINT are configured.",
+      },
+      { status: 400 },
+    );
+  }
+
   try {
-    const headers = await buildAzureOpenAIHeaders();
+    const headers = await buildAzureOpenAIHeaders({
+      apiKeyOverride: wantsReasoning ? reasoningApiKey : undefined,
+    });
     const response = await fetch(
-      `${endpoint}/openai/deployments/${deployment}/chat/completions?api-version=${apiVersion}`,
+      `${targetEndpoint}/openai/deployments/${targetDeployment}/chat/completions?api-version=${targetApiVersion}`,
       {
         method: "POST",
         headers: {

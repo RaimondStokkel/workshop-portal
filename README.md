@@ -24,9 +24,16 @@ A hands-on playground for experimenting with prompt engineering, built with Next
 	AZURE_OPENAI_API_VERSION="2024-08-01-preview"
 	AZURE_OPENAI_CHAT_DEPLOYMENT="<chat-deployment-name>"
 	AZURE_OPENAI_IMAGE_DEPLOYMENT="<image-deployment-name>"
+	AZURE_OPENAI_REASONING_DEPLOYMENT="<optional-reasoning-deployment-name>"
+	AZURE_OPENAI_REASONING_API_VERSION="2025-01-01-preview"
+	AZURE_OPENAI_REASONING_ENDPOINT="https://<optional-reasoning-endpoint>.openai.azure.com"
+	AZURE_OPENAI_REASONING_API_KEY="<optional-reasoning-api-key>"
+	AZURE_OPENAI_REASONING_INCLUDE_REASONING_PARAM="false"
 	AZURE_OPENAI_API_KEY="<optional-api-key-if-not-using-managed-identity>"
 	AZURE_OPENAI_USE_MANAGED_IDENTITY="false"
 	```
+
+	`AZURE_OPENAI_REASONING_*` variables are only required if you enable the reasoning toggle and connect it to a reasoning-capable deployment (for example `o4-mini`). Leave them unset to reuse the default endpoint and credentials. Set `AZURE_OPENAI_REASONING_INCLUDE_REASONING_PARAM` to `true` only for deployments that accept the `reasoning` payload field; keep it `false` for models like `o4-mini` that already reason implicitly.
 
 3. Start the dev server:
 

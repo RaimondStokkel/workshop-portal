@@ -19,9 +19,22 @@ async function getManagedIdentityToken() {
   return token.token;
 }
 
-export async function buildAzureOpenAIHeaders() {
-  const useManagedIdentity =
+type HeaderOptions = {
+  apiKeyOverride?: string;
+  useManagedIdentity?: boolean;
+};
+
+export async function buildAzureOpenAIHeaders(options?: HeaderOptions) {
+  if (options?.apiKeyOverride) {
+    return {
+      "api-key": options.apiKeyOverride,
+    } as Record<string, string>;
+  }
+
+  const envUseManagedIdentity =
     process.env.AZURE_OPENAI_USE_MANAGED_IDENTITY?.toLowerCase() === "true";
+  const useManagedIdentity =
+    options?.useManagedIdentity ?? envUseManagedIdentity;
   const apiKey = process.env.AZURE_OPENAI_API_KEY;
 
   if (apiKey && !useManagedIdentity) {
