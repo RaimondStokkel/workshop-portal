@@ -84,11 +84,9 @@ export async function POST(request: NextRequest) {
       payload.reasoning = {
         effort: reasoning.effort ?? "medium",
       };
-      if (reasoning.maxOutputTokens) {
-        payload.max_output_tokens = reasoning.maxOutputTokens;
-      }
-    } else if (reasoning?.maxOutputTokens) {
-      payload.max_output_tokens = reasoning.maxOutputTokens;
+    }
+    if (reasoning?.maxOutputTokens) {
+      payload.max_tokens = reasoning.maxOutputTokens;
     }
   }
 
