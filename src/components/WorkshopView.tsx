@@ -15,6 +15,8 @@ type ImageResult = {
   value: string;
 };
 
+// Markdown rendering is customized inline when invoking ReactMarkdown.
+
 export function WorkshopView() {
   const [modules, setModules] = useState<WorkshopModule[]>([]);
   const [selectedModule, setSelectedModule] = useState<string>("");
@@ -248,8 +250,85 @@ export function WorkshopView() {
               ) : moduleError ? (
                 <p className="text-red-200">{moduleError}</p>
               ) : (
-                <div className="prose prose-invert max-w-none prose-p:mb-3 prose-headings:mt-6 prose-headings:font-semibold">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{moduleContent}</ReactMarkdown>
+                <div className="space-y-4">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      h1: ({ children }) => (
+                        <h1 className="text-2xl font-semibold text-lime-200">{children}</h1>
+                      ),
+                      h2: ({ children }) => (
+                        <h2 className="mt-6 text-xl font-semibold text-lime-100">{children}</h2>
+                      ),
+                      h3: ({ children }) => (
+                        <h3 className="mt-5 text-lg font-semibold text-lime-100">{children}</h3>
+                      ),
+                      p: ({ children }) => (
+                        <p className="text-base leading-relaxed text-slate-100">{children}</p>
+                      ),
+                      ul: ({ children }) => (
+                        <ul className="ml-5 list-disc space-y-2 text-base text-slate-100 marker:text-lime-300">
+                          {children}
+                        </ul>
+                      ),
+                      ol: ({ children }) => (
+                        <ol className="ml-5 list-decimal space-y-2 text-base text-slate-100 marker:text-lime-300">
+                          {children}
+                        </ol>
+                      ),
+                      li: ({ children }) => (
+                        <li className="pl-1 text-base leading-relaxed text-slate-100">{children}</li>
+                      ),
+                      strong: ({ children }) => (
+                        <strong className="text-slate-50">{children}</strong>
+                      ),
+                      em: ({ children }) => (
+                        <em className="text-slate-200">{children}</em>
+                      ),
+                      code: ({ children }) => (
+                        <code className="rounded bg-slate-950/70 px-1.5 py-0.5 font-mono text-sm text-lime-200">
+                          {children}
+                        </code>
+                      ),
+                      pre: ({ children }) => (
+                        <pre className="overflow-x-auto rounded-lg border border-lime-400/40 bg-slate-950/80 p-3 text-sm text-slate-100">
+                          {children}
+                        </pre>
+                      ),
+                      blockquote: ({ children }) => (
+                        <blockquote className="border-l-4 border-lime-400/60 bg-slate-900/70 px-4 py-2 text-base italic text-slate-100">
+                          {children}
+                        </blockquote>
+                      ),
+                      table: ({ children }) => (
+                        <div className="overflow-x-auto">
+                          <table className="w-full border-collapse text-left text-sm text-slate-100">
+                            {children}
+                          </table>
+                        </div>
+                      ),
+                      thead: ({ children }) => (
+                        <thead className="bg-slate-900/70 text-slate-200">{children}</thead>
+                      ),
+                      th: ({ children }) => (
+                        <th className="border border-white/10 px-3 py-2 text-xs uppercase tracking-wide">
+                          {children}
+                        </th>
+                      ),
+                      td: ({ children }) => (
+                        <td className="border border-white/10 px-3 py-2 text-sm text-slate-100">
+                          {children}
+                        </td>
+                      ),
+                      a: ({ children, href }) => (
+                        <a href={href} className="text-lime-300 underline-offset-2 hover:underline">
+                          {children}
+                        </a>
+                      ),
+                    }}
+                  >
+                    {moduleContent}
+                  </ReactMarkdown>
                 </div>
               )}
             </div>
