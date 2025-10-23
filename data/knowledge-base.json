@@ -1,0 +1,22 @@
+[
+  {
+    "id": "kb-azure-openai",
+    "title": "Azure OpenAI Prompt Engineering",
+    "content": "Use system prompts to steer tone, provide role instructions, constrain format, and remind the model of domain-specific rules. Layer user prompts with explicit steps when requesting complex behavior such as multi-part reasoning."
+  },
+  {
+    "id": "kb-cot",
+    "title": "Chain-of-Thought Patterns",
+    "content": "Favor explicit reasoning scaffolds like \"Let's solve this step by step\" or numbered processes to help the model explore the solution space before returning a final answer. Encourage intermediate conclusions before final results."
+  },
+  {
+    "id": "kb-rag",
+    "title": "Retrieval-Augmented Generation",
+    "content": "Ground responses by retrieving the most relevant documents using embeddings or keyword search. Highlight citations, explain how the answer maps to the evidence, and prefer concise extracts over full documents."
+  },
+  {
+    "id": "kb-data-connectivity",
+    "title": "Connecting to Azure AI Search",
+    "content": "Create an Azure AI Search index with fields for title, content, and tags. Populate it with your enterprise documents, then call the Search REST API before asking the language model to answer the question."
+  }
+]

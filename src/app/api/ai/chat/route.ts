@@ -1,6 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { buildAzureOpenAIHeaders } from "@/lib/azureClient";
 import { z } from "zod";
+import { buildAzureOpenAIHeaders } from "@/lib/azureClient";
+import { retrieveKnowledge } from "@/lib/knowledgeBase";
+
+type ChatMessage = {
+  role: "system" | "user" | "assistant";
+  content: string;
+};
+
+type AzureChatResponse = {
+  choices?: { message?: { content?: string } }[];
+  usage?: Record<string, unknown>;
+};
 
 const chatSchema = z.object({
   systemPrompt: z.string().optional(),
@@ -12,6 +23,12 @@ const chatSchema = z.object({
       enabled: z.boolean(),
       effort: z.enum(["low", "medium", "high"]).optional(),
       maxOutputTokens: z.coerce.number().int().min(1).optional(),
+    })
+    .optional(),
+  knowledgeBase: z
+    .object({
+      enabled: z.boolean(),
+      topK: z.coerce.number().int().min(1).max(5).default(3),
     })
     .optional(),
 });
@@ -51,8 +68,16 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { systemPrompt, prompt, temperature, topP, reasoning } = parsed;
+  const {
+    systemPrompt,
+    prompt,
+    temperature,
+    topP,
+    reasoning,
+    knowledgeBase,
+  } = parsed;
   const wantsReasoning = Boolean(reasoning?.enabled);
+  const wantsKnowledge = Boolean(knowledgeBase?.enabled);
 
   if (wantsReasoning && !reasoningDeployment) {
     return NextResponse.json(
@@ -64,10 +89,46 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const messages = [
-    ...(systemPrompt ? [{ role: "system", content: systemPrompt }] : []),
+  let knowledgeSnippets: Awaited<ReturnType<typeof retrieveKnowledge>> = [];
+  if (wantsKnowledge) {
+    try {
+      knowledgeSnippets = await retrieveKnowledge(
+        prompt,
+        knowledgeBase?.topK ?? 3,
+      );
+    } catch (error) {
+      console.error("Knowledge retrieval failed", error);
+      return NextResponse.json(
+        {
+          error:
+            "Knowledge base lookup failed. Confirm data/knowledge-base.json exists and contains valid JSON.",
+        },
+        { status: 500 },
+      );
+    }
+  }
+
+  const messages: ChatMessage[] = [
+    ...(systemPrompt ? [{ role: "system", content: systemPrompt } as const] : []),
     { role: "user", content: prompt },
   ];
+
+  if (wantsKnowledge && knowledgeSnippets.length > 0) {
+    const contextText = knowledgeSnippets
+      .map(
+        (snippet, index) =>
+          `[KB${index + 1}] ${snippet.title}\n${snippet.excerpt}`,
+      )
+      .join("\n\n");
+
+    const insertIndex = systemPrompt ? 1 : 0;
+    messages.splice(insertIndex, 0, {
+      role: "system",
+      content:
+        "Use the following knowledge base snippets as trusted context. Cite them inline using [KB#] when relevant.\n\n" +
+        contextText,
+    });
+  }
 
   const payload: Record<string, unknown> = {
     messages,
@@ -78,13 +139,14 @@ export async function POST(request: NextRequest) {
     "true";
 
   if (wantsReasoning) {
+    const selectedReasoning = reasoning!;
     if (includeReasoningParam) {
       payload.reasoning = {
-        effort: reasoning.effort ?? "medium",
+        effort: selectedReasoning.effort ?? "medium",
       };
     }
-    if (reasoning?.maxOutputTokens) {
-      payload.max_completion_tokens = reasoning.maxOutputTokens;
+    if (selectedReasoning.maxOutputTokens) {
+      payload.max_completion_tokens = selectedReasoning.maxOutputTokens;
     }
   } else {
     payload.temperature = temperature;
@@ -134,18 +196,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as AzureChatResponse;
     const choice = data.choices?.[0]?.message?.content ?? "";
     return NextResponse.json({
       message: choice,
       usage: data.usage,
-      raw: data,
+      knowledgeSnippets: wantsKnowledge ? knowledgeSnippets : undefined,
     });
   } catch (error) {
-    console.error("Failed to call Azure OpenAI chat", error);
+    console.error("Unexpected chat handler failure", error);
     return NextResponse.json(
       {
-        error: "Unable to reach Azure OpenAI chat endpoint",
+        error: "Unexpected error calling Azure OpenAI",
       },
       { status: 500 },
     );

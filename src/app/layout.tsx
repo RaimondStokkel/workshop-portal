@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Prompt Party Workshop",
+  title: "Prompt Party",
   description:
     "Hands-on playground for exploring prompt engineering with Azure OpenAI.",
 };

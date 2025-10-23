@@ -15,6 +15,13 @@ type ImageResult = {
   value: string;
 };
 
+type KnowledgeSnippet = {
+  id: string;
+  title: string;
+  excerpt: string;
+  score: number;
+};
+
 // Markdown rendering is customized inline when invoking ReactMarkdown.
 
 export function WorkshopView() {
@@ -33,8 +40,11 @@ export function WorkshopView() {
   const [reasoningEnabled, setReasoningEnabled] = useState<boolean>(false);
   const [reasoningEffort, setReasoningEffort] = useState<"low" | "medium" | "high">("medium");
   const [maxOutputTokens, setMaxOutputTokens] = useState<number>(3000);
+  const [knowledgeEnabled, setKnowledgeEnabled] = useState<boolean>(false);
+  const [knowledgeTopK, setKnowledgeTopK] = useState<number>(3);
   const [chatResult, setChatResult] = useState<string>("");
   const [chatUsage, setChatUsage] = useState<string>("");
+  const [chatKnowledge, setChatKnowledge] = useState<KnowledgeSnippet[]>([]);
   const [chatLoading, setChatLoading] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
 
@@ -112,6 +122,7 @@ export function WorkshopView() {
     setChatError(null);
     setChatResult("");
     setChatUsage("");
+    setChatKnowledge([]);
 
     try {
       const response = await fetch("/api/ai/chat", {
@@ -126,6 +137,10 @@ export function WorkshopView() {
             enabled: reasoningEnabled,
             effort: reasoningEffort,
             maxOutputTokens,
+          },
+          knowledgeBase: {
+            enabled: knowledgeEnabled,
+            topK: knowledgeTopK,
           },
         }),
       });
@@ -142,6 +157,9 @@ export function WorkshopView() {
           .map(([key, value]) => `${key}: ${value}`)
           .join(" · ");
         setChatUsage(usageParts);
+      }
+      if (Array.isArray(data.knowledgeSnippets)) {
+        setChatKnowledge(data.knowledgeSnippets as KnowledgeSnippet[]);
       }
     } catch (error) {
       console.error(error);
@@ -204,7 +222,7 @@ export function WorkshopView() {
             </p>
           </div>
           <div className="hidden text-right text-xs sm:block text-slate-400">
-            Powered by your Azure AI Foundry deployment
+            Raimond for Zig Websoftware
           </div>
         </div>
       </header>
@@ -427,11 +445,40 @@ export function WorkshopView() {
                       </div>
                     </>
                   ) : null}
-                {reasoningEnabled ? (
-                  <p className="text-xs text-slate-300">
-                    Temperature and top-p are fixed for reasoning models.
-                  </p>
-                ) : null}
+                  {reasoningEnabled ? (
+                    <p className="text-xs text-slate-300">
+                      Temperature and top-p are fixed for reasoning models.
+                    </p>
+                  ) : null}
+                </div>
+                <div className="flex flex-wrap items-center gap-3 rounded-md border border-white/10 bg-slate-950/60 p-3">
+                  <label className="flex items-center gap-2 text-xs uppercase tracking-wide text-slate-200">
+                    <input
+                      type="checkbox"
+                      checked={knowledgeEnabled}
+                      onChange={(event) => setKnowledgeEnabled(event.target.checked)}
+                      className="size-4 rounded border-white/20 bg-slate-900 text-lime-400 focus:outline-none focus:ring-2 focus:ring-lime-400"
+                    />
+                    Knowledge Base
+                  </label>
+                  {knowledgeEnabled ? (
+                    <div className="flex items-center gap-2 text-xs text-slate-300">
+                      <span>Top K</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={5}
+                        value={knowledgeTopK}
+                        onChange={(event) => setKnowledgeTopK(Number(event.target.value))}
+                        className="w-16 rounded-md border border-white/10 bg-slate-900 px-2 py-1 text-right text-slate-100 focus:border-lime-400 focus:outline-none"
+                      />
+                    </div>
+                  ) : null}
+                  {knowledgeEnabled ? (
+                    <p className="text-xs text-slate-300">
+                      We retrieve supporting context and cite it inline.
+                    </p>
+                  ) : null}
                 </div>
                 <button
                   type="button"
@@ -450,6 +497,19 @@ export function WorkshopView() {
                 {chatResult ? (
                   <div className="mt-3 rounded-md border border-lime-400/30 bg-slate-950/60 p-3 text-sm text-slate-100 whitespace-pre-wrap">
                     {chatResult}
+                  </div>
+                ) : null}
+                {chatKnowledge.length > 0 ? (
+                  <div className="mt-3 space-y-2 rounded-md border border-white/10 bg-slate-950/60 p-3 text-xs text-slate-200">
+                    <p className="font-semibold uppercase tracking-wide text-lime-300">Knowledge Base Context</p>
+                    <ul className="space-y-2">
+                      {chatKnowledge.map((snippet, index) => (
+                        <li key={snippet.id} className="rounded border border-white/10 bg-slate-900/60 p-2">
+                          <p className="font-semibold text-slate-100">[KB{index + 1}] {snippet.title}</p>
+                          <p className="mt-1 text-slate-300">{snippet.excerpt}</p>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 ) : null}
               </div>

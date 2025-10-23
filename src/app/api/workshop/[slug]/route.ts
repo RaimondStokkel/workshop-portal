@@ -8,15 +8,17 @@ function getWorkshopDir() {
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { slug: string } },
+  context: { params: Promise<{ slug: string }> },
 ) {
+  let slug: string | undefined;
   try {
+    ({ slug } = await context.params);
     const dir = getWorkshopDir();
-    const filePath = path.join(dir, `${params.slug}.md`);
+    const filePath = path.join(dir, `${slug}.md`);
     const fileContents = await fs.readFile(filePath, "utf-8");
     return NextResponse.json({ content: fileContents });
   } catch (error) {
-    console.error(`Failed to load module ${params.slug}`, error);
+    console.error(`Failed to load module ${slug ?? "(unknown)"}`, error);
     return NextResponse.json({ error: "Module not found" }, { status: 404 });
   }
 }
