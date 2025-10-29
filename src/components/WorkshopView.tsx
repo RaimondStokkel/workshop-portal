@@ -22,6 +22,28 @@ type KnowledgeSnippet = {
   score: number;
 };
 
+type AgentEntry = {
+  id: string;
+  role: "user" | "assistant" | "tool";
+  content: string;
+  name?: string;
+};
+
+const NS_SERVER_CONFIG = `{
+  "mcpServers": {
+    "ns-server": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "ns-mcp-server"
+      ],
+      "env": {
+        "NS_API_KEY": "your_api_key_here"
+      }
+    }
+  }
+}`;
+
 // Markdown rendering is customized inline when invoking ReactMarkdown.
 
 export function WorkshopView() {
@@ -47,6 +69,24 @@ export function WorkshopView() {
   const [chatKnowledge, setChatKnowledge] = useState<KnowledgeSnippet[]>([]);
   const [chatLoading, setChatLoading] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
+
+  const [agentSystemPrompt, setAgentSystemPrompt] = useState<string>(
+    "You are an MCP-enabled workshop agent that plans tool calls before answering.",
+  );
+  const [agentPrompt, setAgentPrompt] = useState<string>("");
+  const [agentTemperature, setAgentTemperature] = useState<number>(0.7);
+  const [agentTopP, setAgentTopP] = useState<number>(0.9);
+  const [agentConversation, setAgentConversation] = useState<AgentEntry[]>([]);
+  const [agentUsage, setAgentUsage] = useState<string>("");
+  const [agentLoading, setAgentLoading] = useState(false);
+  const [agentError, setAgentError] = useState<string | null>(null);
+  const [showNsServerInstructions, setShowNsServerInstructions] = useState(false);
+  const [nsCopyStatus, setNsCopyStatus] = useState<string>("");
+
+  const generateId = () =>
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2);
 
   const [imagePrompt, setImagePrompt] = useState<string>(
     "A whimsical blueprint-style illustration of collaborative prompting.",
@@ -208,6 +248,125 @@ export function WorkshopView() {
       setImageError((error as Error).message);
     } finally {
       setImageLoading(false);
+    }
+  }
+
+  function toggleNsServerInstructions() {
+    setShowNsServerInstructions((previous) => !previous);
+    setNsCopyStatus("");
+  }
+
+  async function handleNsConfigCopy() {
+    try {
+      await navigator.clipboard.writeText(NS_SERVER_CONFIG);
+      setNsCopyStatus("Copied!");
+    } catch {
+      setNsCopyStatus("Copy failed");
+    }
+    setTimeout(() => setNsCopyStatus(""), 2000);
+  }
+
+  function handleAgentReset() {
+    setAgentConversation([]);
+    setAgentUsage("");
+    setAgentError(null);
+  }
+
+  async function handleAgentSubmit() {
+    if (!agentPrompt.trim()) {
+      return;
+    }
+
+    const historyPayload = agentConversation
+      .filter((entry) => entry.role === "user" || entry.role === "assistant")
+      .map(({ role, content }) => ({ role, content }));
+
+    const userMessage: AgentEntry = {
+      id: generateId(),
+      role: "user",
+      content: agentPrompt.trim(),
+    };
+
+    setAgentConversation((previous) => [...previous, userMessage]);
+    setAgentPrompt("");
+    setAgentLoading(true);
+    setAgentError(null);
+
+    try {
+      const response = await fetch("/api/ai/agent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          systemPrompt: agentSystemPrompt,
+          prompt: userMessage.content,
+          temperature: agentTemperature,
+          topP: agentTopP,
+          history: historyPayload,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorPayload = await response.json().catch(() => ({}));
+        throw new Error(errorPayload?.details ?? errorPayload?.error ?? "Agent request failed");
+      }
+
+      const data = await response.json();
+      if (data.usage) {
+        const usageParts = Object.entries(data.usage as Record<string, unknown>)
+          .map(([key, value]) => `${key}: ${value}`)
+          .join(" · ");
+        setAgentUsage(usageParts);
+      } else {
+        setAgentUsage("");
+      }
+
+      const toolExecutions = Array.isArray(data.toolExecutions)
+        ? (data.toolExecutions as Array<{
+            name?: string;
+            arguments?: Record<string, unknown>;
+            output?: unknown;
+          }>)
+        : [];
+
+      setAgentConversation((previous) => {
+        const updated = [...previous];
+        toolExecutions.forEach((execution) => {
+          const argumentText = execution.arguments
+            ? JSON.stringify(execution.arguments, null, 2)
+            : undefined;
+          const outputText =
+            typeof execution.output === "string"
+              ? execution.output
+              : JSON.stringify(execution.output ?? {}, null, 2);
+          const segments = [
+            argumentText ? `Args:\n${argumentText}` : null,
+            `Output:\n${outputText}`,
+          ].filter(Boolean);
+
+          updated.push({
+            id: generateId(),
+            role: "tool",
+            name: execution.name ?? "tool",
+            content: segments.join("\n\n"),
+          });
+        });
+
+        if (typeof data.message === "string" && data.message.trim().length > 0) {
+          updated.push({
+            id: generateId(),
+            role: "assistant",
+            content: data.message,
+          });
+        }
+
+        return updated;
+      });
+    } catch (error) {
+      console.error(error);
+      setAgentError((error as Error).message);
+      setAgentUsage("");
+    } finally {
+      setAgentLoading(false);
     }
   }
 
@@ -511,6 +670,158 @@ export function WorkshopView() {
                       ))}
                     </ul>
                   </div>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-white/10 bg-slate-900/60 p-5">
+              <h3 className="text-lg font-medium text-lime-200">Agent Playground</h3>
+              <div className="mt-4 flex flex-col gap-3 text-sm">
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs uppercase tracking-wide text-slate-300">
+                    System Prompt
+                  </span>
+                  <textarea
+                    value={agentSystemPrompt}
+                    onChange={(event) => setAgentSystemPrompt(event.target.value)}
+                    className="min-h-[70px] rounded-md border border-white/10 bg-slate-950/60 p-2 text-slate-100 focus:border-lime-400 focus:outline-none"
+                  />
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs uppercase tracking-wide text-slate-300">
+                      Temperature ({agentTemperature.toFixed(2)})
+                    </span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="2"
+                      step="0.1"
+                      value={agentTemperature}
+                      onChange={(event) => setAgentTemperature(Number(event.target.value))}
+                      className="accent-lime-400"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs uppercase tracking-wide text-slate-300">
+                      Top-p ({agentTopP.toFixed(2)})
+                    </span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={agentTopP}
+                      onChange={(event) => setAgentTopP(Number(event.target.value))}
+                      className="accent-lime-400"
+                    />
+                  </label>
+                </div>
+                <div className="rounded-md border border-white/10 bg-slate-950/60 p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs uppercase tracking-wide text-slate-300">
+                      Conversation
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleAgentReset}
+                      disabled={agentLoading || agentConversation.length === 0}
+                      className="text-xs font-semibold text-lime-300 transition hover:text-lime-200 disabled:cursor-not-allowed disabled:text-slate-500"
+                    >
+                      Reset
+                    </button>
+                  </div>
+                  <div className="mt-3 max-h-72 space-y-3 overflow-y-auto">
+                    {agentConversation.length === 0 ? (
+                      <p className="text-xs text-slate-400">The agent is ready for your instructions.</p>
+                    ) : (
+                      agentConversation.map((entry) => {
+                        const label =
+                          entry.role === "user"
+                            ? "You"
+                            : entry.role === "assistant"
+                              ? "Agent"
+                              : `Tool · ${entry.name ?? "tool"}`;
+                        return (
+                          <div
+                            key={entry.id}
+                            className="rounded border border-white/10 bg-slate-900/60 p-2"
+                          >
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">
+                              {label}
+                            </p>
+                            <div className="mt-1 whitespace-pre-wrap text-sm text-slate-100">
+                              {entry.content}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+                <div className="rounded-md border border-white/10 bg-slate-950/60 p-3">
+                  <button
+                    type="button"
+                    onClick={toggleNsServerInstructions}
+                    className="inline-flex items-center gap-2 rounded-md border border-lime-400/60 bg-lime-400/10 px-3 py-2 text-xs font-semibold text-lime-200 transition hover:bg-lime-400/20"
+                  >
+                    {showNsServerInstructions ? "Hide NS MCP setup" : "Enable NS MCP server"}
+                  </button>
+                  {showNsServerInstructions ? (
+                    <div className="mt-3 space-y-3 text-xs text-slate-300">
+                      <p>
+                        Add this server to your MCP configuration to query live Dutch Rail (NS) schedules. Replace
+                        <span className="font-semibold"> NS_API_KEY</span> with your credential before starting the agent.
+                      </p>
+                      <pre className="overflow-x-auto rounded-md border border-lime-400/30 bg-slate-950/80 p-3 text-[11px] leading-relaxed text-lime-200">
+{NS_SERVER_CONFIG}
+                      </pre>
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={handleNsConfigCopy}
+                          className="inline-flex items-center justify-center rounded-md bg-lime-400 px-3 py-1 text-xs font-semibold text-slate-900 transition hover:bg-lime-300"
+                        >
+                          Copy config
+                        </button>
+                        {nsCopyStatus ? (
+                          <span className="text-[11px] text-lime-200">{nsCopyStatus}</span>
+                        ) : null}
+                      </div>
+                      <ol className="ml-4 list-decimal space-y-1 text-[11px] text-slate-300 marker:text-lime-300">
+                        <li>Store the snippet in your MCP-enabled client config.</li>
+                        <li>Run <code className="rounded bg-slate-900 px-1 py-0.5 text-[11px] text-lime-200">npx -y ns-mcp-server</code> locally.</li>
+                        <li>Restart the agent playground and invoke tools like <code className="rounded bg-slate-900 px-1 py-0.5 text-[11px] text-lime-200">ns-server.get_departures</code>.</li>
+                      </ol>
+                    </div>
+                  ) : null}
+                </div>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs uppercase tracking-wide text-slate-300">
+                    Instruction
+                  </span>
+                  <textarea
+                    value={agentPrompt}
+                    onChange={(event) => setAgentPrompt(event.target.value)}
+                    placeholder="Ask the agent to coordinate a task..."
+                    className="min-h-[110px] rounded-md border border-white/10 bg-slate-950/60 p-2 text-slate-100 focus:border-lime-400 focus:outline-none"
+                  />
+                </label>
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleAgentSubmit}
+                    disabled={agentLoading || !agentPrompt.trim()}
+                    className="inline-flex items-center justify-center rounded-md bg-lime-400 px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-lime-300 disabled:cursor-not-allowed disabled:bg-lime-600/40"
+                  >
+                    {agentLoading ? "Thinking..." : "Send to Agent"}
+                  </button>
+                  {agentUsage ? (
+                    <p className="text-xs text-slate-300">{agentUsage}</p>
+                  ) : null}
+                </div>
+                {agentError ? (
+                  <p className="text-sm text-red-200">{agentError}</p>
                 ) : null}
               </div>
             </div>
