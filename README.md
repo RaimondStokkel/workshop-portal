@@ -31,9 +31,10 @@ A hands-on playground for experimenting with prompt engineering, built with Next
 	AZURE_OPENAI_REASONING_INCLUDE_REASONING_PARAM="false"
 	AZURE_OPENAI_API_KEY="<optional-api-key-if-not-using-managed-identity>"
 	AZURE_OPENAI_USE_MANAGED_IDENTITY="false"
+	WORKSHOP_PORTAL_PASSWORD="<required-portal-password>"
 	```
 
-	`AZURE_OPENAI_REASONING_*` variables are only required if you enable the reasoning toggle and connect it to a reasoning-capable deployment (for example `o4-mini`). Leave them unset to reuse the default endpoint and credentials. Set `AZURE_OPENAI_REASONING_INCLUDE_REASONING_PARAM` to `true` only for deployments that accept the `reasoning` payload field; keep it `false` for models like `o4-mini` that already reason implicitly.
+	`AZURE_OPENAI_REASONING_*` variables are only required if you enable the reasoning toggle and connect it to a reasoning-capable deployment (for example `o4-mini`). Leave them unset to reuse the default endpoint and credentials. Set `AZURE_OPENAI_REASONING_INCLUDE_REASONING_PARAM` to `true` only for deployments that accept the `reasoning` payload field; keep it `false` for models like `o4-mini` that already reason implicitly. `WORKSHOP_PORTAL_PASSWORD` is mandatory: without it the portal responds with a lockout screen.
 
 3. Start the dev server:
 
@@ -46,7 +47,7 @@ A hands-on playground for experimenting with prompt engineering, built with Next
 ### Deploying to Azure App Service
 
 1. Ensure you are logged into Azure CLI and have selected the right subscription.
-2. Provision an App Service (Linux, Node 20+) and set the environment variables from `.env.example` in the App Service configuration.
+2. Provision an App Service (Linux, Node 20+) and set the environment variables from `.env.example` in the App Service configuration, including `WORKSHOP_PORTAL_PASSWORD`.
 3. Deploy with Azure Developer CLI or Azure CLI. A quick option with zip deployment:
 
 	```bash
